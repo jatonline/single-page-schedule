@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!--
-    SinglePageSchedule v0.4.1
-    Copyright (C) 2022, James Thomas (MIT License)
+    SinglePageSchedule v0.5
+    Copyright (C) 2022-2023, James Thomas (MIT License)
     Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
     1. Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
     2. Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
@@ -12,7 +12,7 @@
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
-        <title>SinglePageSchedule v0.4.1</title>
+        <title>SinglePageSchedule v0.5</title>
         <style>
             *,
             *:before,
@@ -22,7 +22,12 @@
             body {
                 font-family: Arial, Helvetica, sans-serif;
             }
-            #source {
+            input {
+                margin: 1rem 0;
+                width: 100%;
+                display: block;
+            }
+            textarea {
                 margin: 1rem 0;
                 width: 100%;
                 height: 20rem;
@@ -39,13 +44,18 @@
         </style>
     </head>
     <body>
-        <h1>SinglePageSchedule <small>v0.4.1</small></h1>
-        <textarea id="source" placeholder="Paste table from Excel here" disabled></textarea>
-        <button id="preview" disabled>Preview</button>
-        <button id="download" disabled>Save as webpage</button>
-        <button id="download_calendar" disabled>Save as calendar</button>
-        <button id="example" disabled>Get example data</button>
-        <button id="clear" disabled>Clear</button>
+        <h1>SinglePageSchedule <small>v0.5</small></h1>
+        <form id="template_form">
+            <input id="conference_name" placeholder="Enter a conference name here (goes in the page title)" required disabled>
+            <input id="conference_description" placeholder="Enter a conference description here (for search engines)" required disabled>
+            <input id="conference_url" placeholder="Enter URL for the main conference page (for the back link)" required disabled>
+            <textarea id="source" placeholder="Paste table of event data from Excel here" required disabled></textarea>
+            <button id="preview" disabled>Preview</button>
+            <button id="download" disabled>Save as webpage</button>
+            <button id="download_calendar" disabled>Save as calendar</button>
+            <button id="example" disabled>Get example data</button>
+            <button id="clear" disabled>Clear</button>
+        </form>
         <div id="result"></div>
 
         <script>
@@ -87,6 +97,15 @@
             window.onload = function() {
                 loadCache();
 
+                conference_name.onchange = updateCache;
+                conference_name.disabled = false;
+
+                conference_description.onchange = updateCache;
+                conference_description.disabled = false;
+
+                conference_url.onchange = updateCache;
+                conference_url.disabled = false;
+
                 source.onchange = updateCache;
                 source.disabled = false;
 
@@ -111,7 +130,7 @@
 
             const dataSchema = row => ({
                 date: parseDate(row.date) || undefined,
-                column: +row.column || undefined,
+                column: +row.column || (row.column == 'span') && 'span' || undefined,
                 startTime: parseDateTime(row.date + 'T' + row.startTime) || undefined,
                 endTime: parseDateTime(row.date + 'T' + row.endTime) || undefined,
                 title: row.title || undefined,
@@ -143,7 +162,7 @@
                 const gridTimes = d3.timeTicks(minTime, maxTime, quarterHourly);
                 const labelTimes = d3.timeTicks(minTime, maxTime, d3.timeHour);
                 const labelGridStep = gridTimes.map(x => +x).indexOf(+labelTimes[1]);
-                const overallMaxColumns = d3.max(data, x => x.column);
+                const overallMaxColumns = d3.max(data, x => +x.column);
 
                 // Sort by datetime of event start, and then column
                 data.sort((a, b) => a.column - b.column)
@@ -152,10 +171,13 @@
                 data = d3.group(data, row => row.date);
 
                 let context = {
+                    conference_name: conference_name.value,
+                    conference_description: conference_description.value,
+                    conference_url: conference_url.value,
                     days: d3.map(data, ([date, events]) => ({
                         date: date,
                         events: events,
-                        num_columns: d3.max(events, event => event.column)
+                        num_columns: d3.max(events, event => +event.column)
                     })),
                     gridTimes: gridTimes,
                     labelTimes: labelTimes,
@@ -199,6 +221,7 @@
                 data.sort((a, b) => a.startTime - b.startTime)
 
                 let context = {
+                    conference_name: conference_name.value,
                     events: data,
                     now: d3.timeSecond()
                 }
@@ -207,6 +230,7 @@
             }
 
             function previewSchedule() {
+                event.preventDefault();
                 const schedule = generateSchedule();
                 if (schedule) {
                     const blob = new Blob([schedule], {type: 'text/html'});
@@ -217,6 +241,7 @@
             }
 
             function downloadSchedule() {
+                event.preventDefault();
                 const schedule = generateSchedule();
                 if (schedule) {
                     const blob = new Blob([schedule], {type: 'text/html'});
@@ -230,6 +255,7 @@
             }
 
             function downloadCalendar() {
+                event.preventDefault();
                 const schedule = generateCalendar();
                 if (schedule) {
                     const blob = new Blob([schedule], {type: 'text/calendar'});
@@ -247,20 +273,35 @@
             }
 
             function getExample() {
+                event.preventDefault();
+                conference_name.value = "Bristol Data Week 2023";
+                conference_description.value = "Exploring how we can make data work for everyone. Join us for Bristol Data Week 2023 (5–9 June); an interactive programme of speakers, training, and workshops, open to all and completely free of charge.";
+                conference_url.value = "https://www.bristol.ac.uk/golding/events/data-week/";
                 source.value = exampleSource.innerHTML.replaceAll(/^\s*/gm, '').replaceAll(/,/g, '\t');
                 source.onchange();
             }
 
             function clearSource() {
+                event.preventDefault();
+                conference_name.value = '';
+                conference_description.value = '';
+                conference_url.value = '';
                 source.value = '';
-                source.onchange();
+                conference_name.onchange();
+                conference_name.focus();
             }
 
             function loadCache() {
+                conference_name.value = localStorage.conference_name ?? '';
+                conference_description.value = localStorage.conference_description ?? '';
+                conference_url.value = localStorage.conference_url ?? '';
                 source.value = localStorage.source ?? '';
             }
 
             function updateCache() {
+                localStorage.conference_name = conference_name.value;
+                localStorage.conference_description = conference_description.value;
+                localStorage.conference_url = conference_url.value;
                 localStorage.source = source.value;
             }
 
@@ -280,7 +321,6 @@
             }
 
             Handlebars.registerHelper('toLower', string => string.toLowerCase());
-            Handlebars.registerHelper('toUpper', string => string.toUpperCase());
             Handlebars.registerHelper('add', (number1, number2) => number1 + number2);
             Handlebars.registerHelper('toStartRow', quarterHourly.floor);
             Handlebars.registerHelper('toEndRow', quarterHourly.ceil);
@@ -343,8 +383,8 @@
         <script id="html_template" type="text/x-handlebars-template">
             <!DOCTYPE html>  
             <!--  
-            Generated by SinglePageSchedule v0.4.1  
-            Copyright (C) 2022, James Thomas (MIT License)  
+            Generated by SinglePageSchedule v0.5  
+            Copyright (C) 2022-2023, James Thomas (MIT License)  
             Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:  
             1. Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.  
             2. Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.  
@@ -355,12 +395,12 @@
                 <head>
                     <meta charset="utf-8">
                     <meta name="viewport" content="width=device-width, initial-scale=1">
-                    <title>Interactive Schedule for Bristol Data Week 2022</title>
-                    <meta name="description" content="Exploring how we can make data work for everyone. Join us for Bristol Data Week 2022 (13–17 June); an interactive programme of speakers, training, and workshops, open to all and completely free of charge.">
+                    <title>Interactive Schedule for {{conference_name}}</title>
+                    <meta name="description" content="{{conference_description}}">
                     {{{style}}}
                 </head>
                 <body>
-                    <h1><a href="https://www.bristol.ac.uk/golding/get-involved/data-week/" title="Back to Bristol Data Week homepage">Bristol Data Week 2022</a></h1>
+                    <h1><a href="{{conference_url}}" title="Back to {{conference_name}} homepage">{{conference_name}}</a></h1>
 
                     <div id="schedule">
                         <div>
@@ -368,12 +408,15 @@
 
                             {{#each days}}
                             <ul>
-                                <li class="schedule_heading"><h2>{{toUpper (toDay date)}}{{toOrdinal date}}</h2></li>
+                                <li class="schedule_heading"><h2>{{toDay date}}{{toOrdinal date}} {{toMonth date}}</h2></li>
                                 <li aria-hidden="true" class="schedule_times"><div></div>{{#each ../labelTimes}}{{#unless @last}}<time>{{toTime this}}</time>{{/unless}}{{/each}}</li>
                                 <li aria-hidden="true" class="schedule_shading">{{#each ../labelTimes}}{{#unless @last}}<time></time>{{/unless}}{{/each}}</li>
 
                                 {{#each events}}
                                 <li class="schedule_event schedule_type_{{toLower type}} schedule_column_{{column}}" style="grid-row: time-{{toStylesheetTime (toStartRow startTime)}} / time-{{toStylesheetTime (toEndRow endTime)}};">
+                                    <time datetime="{{toIsoTime startTime}}-{{toIsoTime endTime}}"><span aria-label="Date" class="sr-only">{{toDay date}}{{toOrdinal date}} {{toMonth date}},</span> <span aria-label="Time">{{toTime startTime}}-{{toTime endTime}}</span></time>
+                                    {{#if location}}<span aria-label="Location" class="schedule_location schedule_location_{{toLower location}}">{{nonBreakingHyphen location}}</span>{{/if}}
+                                    {{#if type}}<span aria_label="Event type" class="schedule_type">{{type}}</span>{{/if}}
                                     <h3>
                                         {{#if link}}
                                         <a target="_blank" href="{{link}}" title="{{type}}">{{title}}</a>
@@ -381,11 +424,7 @@
                                         {{title}}
                                         {{/if}}
                                     </h3>
-                                    <address>
-                                        {{#if speaker}}<span aria-label="Speaker">{{speaker}}</span><br>{{/if}}
-                                        <time datetime="{{toIsoTime startTime}}-{{toIsoTime endTime}}"><span aria-label="Date" class="sr-only">{{toDay date}}{{toOrdinal date}} {{toMonth date}},</span> <span aria-label="Time">{{toTime startTime}}-{{toTime endTime}}</span></time>{{#if location}}, <span aria-label="Location">{{nonBreakingHyphen location}}</span>{{/if}}
-                                        <span aria_label="Event type" class="schedule_type sr-only">{{type}}</span>
-                                    </address>
+                                    {{#if speaker}}<span aria-label="Speaker">{{speaker}}</span><br>{{/if}}
                                 </li>
                                 {{/each}}
                             </ul>
@@ -462,7 +501,7 @@
                 right: 0.5rem;
                 bottom: 0.5rem;
                 left: 0.5rem;
-                font-size: 0.68rem;
+                font-size: 0.8rem;
 
                 .screen-size-mobile({
                     top: 7rem;
@@ -496,7 +535,7 @@
 
                     {{#each days}}
                     &:nth-child({{add @index 2}}) {
-                        grid-template-columns: repeat({{num_columns}}, minmax(9rem, 1fr));
+                        grid-template-columns: repeat({{num_columns}}, minmax(12rem, 1fr));
                     }
                     {{/each}}
 
@@ -506,7 +545,7 @@
 
                         {{#each days}}
                         &:nth-child({{add @index 2}}) {
-                            grid-template-columns: 4rem repeat({{num_columns}}, minmax(9rem, 1fr));
+                            grid-template-columns: 4rem repeat({{num_columns}}, minmax(12rem, 1fr));
                         }
                         {{/each}}
                     });
@@ -524,20 +563,25 @@
                 .schedule_event {
                     position: relative;
                     margin: 0.2rem 0.25rem 0.3rem;
-                    padding: 0.3rem 0.5rem;
+                    padding: 0.4rem 0.5rem 0.6rem;
                     border-radius: 0.25rem;
 
                     {{#times overallMaxColumns}}
                     &.schedule_column_{{this}} { grid-column: {{this}} }
                     {{/times}}
+
+                    &.schedule_column_span { grid-column: 1 / -1 }
                     
                     .screen-size-tablet({
                         {{#times overallMaxColumns}}
                         &.schedule_column_{{this}} { grid-column: {{add this 1}} }
                         {{/times}}
+
+                        &.schedule_column_span { grid-column: 2 / -1 }
                     });
 
                     h3 {
+                        font-size: 1.2em;
                         margin: 0 0 0.05rem;
                     }
 
@@ -571,7 +615,32 @@
                         }
                     }
 
-                    address {
+                    .schedule_type,
+                    .schedule_location {
+                        font-size: 0.9em;
+                        font-weight: bold;
+                        display: inline-block;
+                        padding: 0.2rem 0.3rem;
+                        border-radius: 0.25rem;
+                        margin: 0.2rem 0.2rem 0.2rem 0;
+                        text-transform: uppercase;
+                    }
+
+                    .schedule_type {
+                        background: #0003;
+                    }
+
+                    .schedule_location_in-person {
+                        color: @page-foreground-color;
+                        background: @page-background-color;
+                    }
+                    
+                    .schedule_location_online {
+                        color: @page-background-color;
+                        background: @page-foreground-color;
+                    }
+
+                    time {
                         display: block;
                     }
                 }
@@ -646,7 +715,7 @@
                         padding: 0.5rem;
                         text-align: center;
                         color: @times-foreground-color;
-                        font-size: 0.75rem;
+                        font-size: 0.9rem;
 
                         &:last-child {
                             border-bottom: none;
@@ -702,7 +771,7 @@
                 padding: 0;
                 margin: 0;
                 display: flex;
-                font-size: 0.68rem;
+                font-size: 0.9rem;
                 font-weight: bold;
                 align-items: center;
                 justify-content: end;
@@ -814,7 +883,7 @@
             BEGIN:VCALENDAR
             PRODID:SinglePageSchedule
             VERSION:2.0
-            X-WR-CALNAME:Bristol Data Week 2022
+            X-WR-CALNAME:{{conference_name}}
             X-PUBLISHED-TTL:PT6H
             {{#each events}}
             BEGIN:VEVENT
@@ -832,10 +901,10 @@
         </script>
         <script id="exampleSource" type="text/x-handlebars-template">
             date,column,startTime,endTime,title,speaker,location,type,link
-            2022-06-01,1,10:00,10:50,Our seminar event,Speaker here,Online,Seminar,http://example.com
-            2022-06-01,2,10:30,11:20,Our workshop event,,In-person,Workshop,http://example.com
-            2022-06-01,3,11:00,15:45,Our training event,,Online,Training,http://example.com
-            2022-06-02,1,10:30,11:25,Our social event,,,Social,
+            2023-06-05,1,10:00,10:50,Our seminar event,Speaker here,Online,Seminar,http://example.com
+            2023-06-05,2,10:30,11:20,Our workshop event,,In-person,Workshop,http://example.com
+            2023-06-05,3,11:00,15:45,Our training event,,Online,Training,http://example.com
+            2023-06-06,1,10:30,11:25,Our social event,,,Social,
         </script>
     </body>
 </html>
