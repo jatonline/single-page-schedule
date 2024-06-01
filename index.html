@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!--
-    SinglePageSchedule v0.5
-    Copyright (C) 2022-2023, James Thomas (MIT License)
+    SinglePageSchedule v0.6
+    Copyright (C) 2022-2024, James Thomas (MIT License)
     Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
     1. Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
     2. Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
@@ -12,7 +12,7 @@
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
-        <title>SinglePageSchedule v0.5</title>
+        <title>SinglePageSchedule v0.6</title>
         <style>
             *,
             *:before,
@@ -23,18 +23,24 @@
                 font-family: Arial, Helvetica, sans-serif;
             }
             input {
-                margin: 1rem 0;
+                margin: 0 0 1rem;
                 width: 100%;
                 display: block;
             }
             textarea {
-                margin: 1rem 0;
+                margin: 0 0 1rem;
                 width: 100%;
                 height: 20rem;
                 display: block;
                 tab-size: 12;
                 white-space: pre;
             }
+			details {
+				margin: 0 0 1rem;
+			}
+			fieldset {
+				padding-top: 1rem;
+			}
             #result {
                 color: red;
             }
@@ -44,17 +50,26 @@
         </style>
     </head>
     <body>
-        <h1>SinglePageSchedule <small>v0.5</small></h1>
+        <h1>SinglePageSchedule <small>v0.6</small></h1>
         <form id="template_form">
-            <input id="conference_name" placeholder="Enter a conference name here (goes in the page title)" required disabled>
-            <input id="conference_description" placeholder="Enter a conference description here (for search engines)" required disabled>
-            <input id="conference_url" placeholder="Enter URL for the main conference page (for the back link)" required disabled>
-            <textarea id="source" placeholder="Paste table of event data from Excel here" required disabled></textarea>
+            <label>Conference name: <input id="conference_name" placeholder="Enter a conference name here (goes in the page title)" required disabled></label>
+            <label>Conference description: <input id="conference_description" placeholder="Enter a conference description here (for search engines)" required disabled></label>
+            <label>Conference URL: <input id="conference_url" placeholder="Enter URL for the main conference page (for the back link)" required disabled></label>
+			<details>
+				<summary>Advanced settings</summary>
+				<fieldset>
+					<label>Minimum number of columns per day: <input id="min_columns" type="number" value="0" min="0" required disabled></label>
+				</fieldset>
+			</details>
+            <label>
+				Event data:
+				<textarea id="source" placeholder="Paste table of event data from Excel here" required disabled></textarea>
+			</label>
             <button id="preview" disabled>Preview</button>
             <button id="download" disabled>Save as webpage</button>
             <button id="download_calendar" disabled>Save as calendar</button>
             <button id="example" disabled>Get example data</button>
-            <button id="clear" disabled>Clear</button>
+            <button id="clear" disabled>Clear all</button>
         </form>
         <div id="result"></div>
 
@@ -105,6 +120,9 @@
 
                 conference_url.onchange = updateCache;
                 conference_url.disabled = false;
+
+                min_columns.onchange = updateCache;
+                min_columns.disabled = false;
 
                 source.onchange = updateCache;
                 source.disabled = false;
@@ -162,7 +180,7 @@
                 const gridTimes = d3.timeTicks(minTime, maxTime, quarterHourly);
                 const labelTimes = d3.timeTicks(minTime, maxTime, d3.timeHour);
                 const labelGridStep = gridTimes.map(x => +x).indexOf(+labelTimes[1]);
-                const overallMaxColumns = d3.max(data, x => +x.column);
+                const overallMaxColumns = d3.max([d3.max(data, x => +x.column), min_columns.value]);
 
                 // Sort by datetime of event start, and then column
                 data.sort((a, b) => a.column - b.column)
@@ -177,7 +195,7 @@
                     days: d3.map(data, ([date, events]) => ({
                         date: date,
                         events: events,
-                        num_columns: d3.max(events, event => +event.column)
+                        num_columns: d3.max([d3.max(events, event => +event.column), min_columns.value])
                     })),
                     gridTimes: gridTimes,
                     labelTimes: labelTimes,
@@ -277,6 +295,7 @@
                 conference_name.value = "Bristol Data Week 2023";
                 conference_description.value = "Exploring how we can make data work for everyone. Join us for Bristol Data Week 2023 (5–9 June); an interactive programme of speakers, training, and workshops, open to all and completely free of charge.";
                 conference_url.value = "https://www.bristol.ac.uk/golding/events/data-week/";
+                min_columns.value = 2;
                 source.value = exampleSource.innerHTML.replaceAll(/^\s*/gm, '').replaceAll(/,/g, '\t');
                 source.onchange();
             }
@@ -286,6 +305,7 @@
                 conference_name.value = '';
                 conference_description.value = '';
                 conference_url.value = '';
+                min_columns.value = 0;
                 source.value = '';
                 conference_name.onchange();
                 conference_name.focus();
@@ -295,6 +315,7 @@
                 conference_name.value = localStorage.conference_name ?? '';
                 conference_description.value = localStorage.conference_description ?? '';
                 conference_url.value = localStorage.conference_url ?? '';
+                min_columns.value = localStorage.min_columns ?? '';
                 source.value = localStorage.source ?? '';
             }
 
@@ -302,6 +323,7 @@
                 localStorage.conference_name = conference_name.value;
                 localStorage.conference_description = conference_description.value;
                 localStorage.conference_url = conference_url.value;
+                localStorage.min_columns = min_columns.value;
                 localStorage.source = source.value;
             }
 
@@ -383,8 +405,8 @@
         <script id="html_template" type="text/x-handlebars-template">
             <!DOCTYPE html>  
             <!--  
-            Generated by SinglePageSchedule v0.5  
-            Copyright (C) 2022-2023, James Thomas (MIT License)  
+            Generated by SinglePageSchedule v0.6  
+            Copyright (C) 2022-2024, James Thomas (MIT License)  
             Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:  
             1. Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.  
             2. Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.  
